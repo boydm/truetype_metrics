@@ -1,3 +1,8 @@
+#
+#  Created by Boyd Multerer on 24/02/19.
+#  Copyright © 2019 Kry10 Industries. All rights reserved.
+#
+
 defmodule TruetypeMetricsTest do
   use ExUnit.Case
   doctest TruetypeMetrics
