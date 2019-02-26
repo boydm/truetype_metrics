@@ -8,10 +8,12 @@ defmodule TruetypeMetrics do
   Documentation for TruetypeMetrics.
   """
 
-  import IEx
+  # import IEx
+
+  @version            "0.1.0"
+
 
   @version_one          <<0, 1, 0, 0>>
-  @magic_number         0x5F0F3CF5
   @magic_number_bin     <<0x5F, 0x0F, 0x3C, 0xF5>>
 
   @invalid_font         { :error, :invalid_font }
@@ -24,8 +26,6 @@ defmodule TruetypeMetrics do
     |> :calendar.datetime_to_gregorian_seconds()
 
   @font_to_unix_seconds @font_epoch - @unix_epoch
-
-  @ppem_to_point        0.75
 
   @signature_type       FontMetrics.expected_hash()
 
@@ -58,44 +58,39 @@ defmodule TruetypeMetrics do
     table_data :: binary
   >> = font_data ) do
 
-    master_checksum = checksum( font_data )
-
     # parse out all the pieces
     with {:ok, tables} <- parse_tables( table_data, table_count ),
     {:ok, head} <- parse_head( font_data, tables ),
     :ok <- check_master_checksum( font_data, head.checksum_adjustment ),
-    {codepoints, glyphs} <- parse_cmap_2( font_data, tables ),
-    # {:ok, h_metrics} <- parse_h_metrics( raw_data, tables, codepoints, glyphs ),
-    # # {:ok, interim} <- parse_maxp( interim, raw_data ),
-    {:ok, kerning} <- parse_kern( font_data, tables ) do
-      pry()
+    {:ok, glyph_ids} <- parse_cmap_glyphs_ids(font_data, tables),
+    {:ok, hhea, metrics} <- parse_metrics( font_data, tables, glyph_ids ),
+    {:ok, kerning} <- parse_kern( font_data, tables, glyph_ids ) do
+      
+      # calculate a better sha hash of the font
+      signature = :crypto.hash( @signature_type, font_data )
+      |> Base.url_encode64( padding: false )
 
-    # {:ok, interim} <- parse_cmap( interim, raw_data ) do
-      # signature = :crypto.hash( @signature_type, raw_data )
-      # |> Base.url_encode64( padding: false )
-      # pry()
-      # {:ok, %FontMetrics{
-      #   source: %FontMetrics.Source{
-      #     signature_type: @signature_type,
-      #     signature: signature,
-      #     created_at: interim.head.created,
-      #     modified_at: interim.head.modified,          
-      #     font_type: "TrueType"
-      #   },
-      #   direction: interim.head.direction,
-      #   smallest_ppem: interim.head.smallest_ppem,
-      #   glyph_count: interim.glyph_count,
-      #   bounding_box: {
-      #       interim.head.x_min,
-      #       interim.head.y_min,
-      #       interim.head.x_max - interim.head.x_min,
-      #       interim.head.y_max - interim.head.y_min
-      #     },
-      #   units_per_em: interim.head.units_per_em,
-      #   ranges: FontMetrics.Ranges.simplify( interim.ranges ),
-      #   kerning: interim[:kern],
-      #   style: interim.head.style
-      # }}
+      # build the final FontMetrics struct
+      {:ok, %FontMetrics{
+        version: @version,
+        source: %FontMetrics.Source{
+          signature_type: @signature_type,
+          signature: signature,
+          created_at: head.created,
+          modified_at: head.modified,          
+          font_type: "TrueType"
+        },
+        # style: head.style,
+        direction: head.direction,
+        smallest_ppem: head.smallest_ppem,
+        units_per_em: head.units_per_em,
+        max_box: {head.x_min, head.y_min, head.x_max, head.y_max},
+        kerning: kerning,
+        ascent: hhea.ascent,
+        descent: hhea.descent,
+        # line_gap: hhea.line_gap,
+        metrics: metrics
+      }}
     else
       bad_checksum when is_integer(bad_checksum) -> @invalid_font
       err -> err
@@ -148,7 +143,7 @@ defmodule TruetypeMetrics do
   #--------------------------------------------------------
   defp parse_head( font_data, tables ) do
     case get_table_data( font_data, tables, "head" ) do
-      { :ok, head_data, check } -> do_parse_head( head_data, check )
+      { :ok, head_data } -> do_parse_head( head_data )
       err -> err
     end
   end
@@ -170,9 +165,9 @@ defmodule TruetypeMetrics do
     style :: unsigned-integer-size(16)-big,
     lowest_ppem :: unsigned-integer-size(16)-big,
     direction :: signed-integer-size(16)-big,
-    index_to_loc_format :: integer-size(16)-big,
+    loca_format :: integer-size(16)-big,
     glyph_data_format :: integer-size(16)-big,
-  >> = table_data, check ) do
+  >> ) do
     {:ok, %{
       version: @version_one,
       font_revision: font_revision,
@@ -185,19 +180,13 @@ defmodule TruetypeMetrics do
       y_min: y_min,
       x_max: x_max,
       y_max: y_max,
-      style: case style do
-        0 -> :bold
-        1 -> :italic
-        2 -> :underline
-        3 -> :outline
-        4 -> :shadow
-        5 -> :condensed
-        6 -> :extended
-        _ -> :unknown
-      end,
+      style: style,
       smallest_ppem: lowest_ppem,
       direction: direction,
-      index_to_loc_format: index_to_loc_format,
+      loca_format: case loca_format do
+        0 -> :short
+        1 -> :long
+      end,
       glyph_data_format: glyph_data_format
     }}
   end
@@ -209,22 +198,77 @@ defmodule TruetypeMetrics do
   #============================================================================
   # metrics tables
 
+    # {:ok, default, advanced} <- parse_metrics( raw_data, tables ),
+
   #--------------------------------------------------------
-  defp parse_h_metrics( info, font_data ) do
-    with  {:ok, data} <- get_table_data( info, font_data, "hhea" ),
-    {:ok, hhea} <- do_parse_hhea( data ),
-    {:ok, data } <- get_table_data( info, font_data, "hmtx" ),
-    {:ok, hmtx} <- do_parse_hmtx( data, hhea.num_h_metrics - 1 ) do
-      pry()
+  # just gets the advancement data
+  defp parse_metrics( font_data, tables, glyph_ids ) do
+    with {:ok, data} <- get_table_data( font_data, tables, "hhea" ),
+    {:ok, hhea} <- parse_hhea( data ),
+    {:ok, data } <- get_table_data( font_data, tables, "hmtx" ),
+    {:ok, hmtx} <- parse_hmtx( data, hhea.num_h_metrics - 1 ) do
+      # combine it all together..
+
+      # first, get the default character advance
+      {default_advance, _lsb} = hmtx[0]
+
+      # The id points to a glyph. We want to point to codepoints
+      metrics = Enum.reduce(glyph_ids, %{}, fn({id,codepoints}, out) ->
+        adv = case hmtx[id] do
+          nil -> default_advance
+          {adv, _} -> adv
+        end
+        Enum.reduce(codepoints, out, &Map.put(&2, &1, adv) )
+      end)
+
+      {:ok, hhea, metrics}
+
     else
-      err ->
-        pry()
-        err
+      err -> err
     end
   end
 
+  # #--------------------------------------------------------
+  # # this version attempts to get the bounding box for each glyph
+  # defp parse_metrics( font_data, tables, glyph_ids, loca_format ) do
+  #   with {:ok, data} <- get_table_data( font_data, tables, "hhea" ),
+  #   {:ok, hhea} <- parse_hhea( data ),
+  #   {:ok, data } <- get_table_data( font_data, tables, "hmtx" ),
+  #   {:ok, hmtx} <- parse_hmtx( data, hhea.num_h_metrics - 1 ),
+  #   {:ok, data } <- get_table_data( font_data, tables, "loca" ),
+  #   {:ok, loca} <- parse_loca( data, loca_format ),
+  #   {:ok, data } <- get_table_data( font_data, tables, "glyf" ),      
+  #   {:ok, glyf_boxes} <- parse_glyf_boxes( data, loca ) do
+  #     # combine it all together..
+
+  #     # first, get the default character advance
+  #     {default_advance, _lsb} = hmtx[0]
+
+  #     # loop through all the entries in the loca table. Use that to lookup
+  #     # the data in the other tables and build the final metrics map
+  #     metrics = Enum.reduce(loca, %{}, fn({id,glyph_offset}, out) ->
+  #       # The id points to a glyph. We want to point to codepoints.
+  #       case glyph_ids[id] do
+  #         nil -> out
+  #         codepoints ->
+  #           metric = case hmtx[id] do
+  #             nil -> {default_advance, glyf_boxes[id]} #Map.put( out, id, {default_advance, glyf_boxes[id]} )
+  #             {adv,_lsb} -> {adv, glyf_boxes[id]} #Map.put( out, id, {adv, glyf_boxes[id]} )
+  #           end
+  #           Enum.reduce(codepoints, out, &Map.put(&2, &1, metric) )
+  #       end
+        
+  #     end)
+
+  #     {:ok, hhea, metrics}
+
+  #   else
+  #     err -> err
+  #   end
+  # end
+
   #--------------------------------------------------------
-  defp do_parse_hhea( <<
+  defp parse_hhea( <<
     @version_one,
     ascent :: signed-integer-size(16)-big,
     descent :: signed-integer-size(16)-big,
@@ -262,12 +306,12 @@ defmodule TruetypeMetrics do
   end
 
   # something required didn't match.
-  defp do_parse_hhea( _ ), do: {:error, :invalid_table, "hhea"}
+  defp parse_hhea( _ ), do: {:error, :invalid_table, "hhea"}
 
   #--------------------------------------------------------
-  defp do_parse_hmtx( metrics, last_metric, out \\ %{}, n \\ 0 )
+  defp parse_hmtx( metrics, last_metric, out \\ %{}, n \\ 0 )
 
-  defp do_parse_hmtx(
+  defp parse_hmtx(
     <<
       advance_width :: signed-integer-size(16)-big,
       lsb :: signed-integer-size(16)-big
@@ -278,7 +322,7 @@ defmodule TruetypeMetrics do
     {:ok, out}
   end
 
-  defp do_parse_hmtx(
+  defp parse_hmtx(
     <<
       advance_width :: signed-integer-size(16)-big,
       lsb :: signed-integer-size(16)-big,
@@ -287,36 +331,75 @@ defmodule TruetypeMetrics do
     last_metric, out, n 
   ) do
     out = Map.put(out, n, {advance_width, lsb})
-    do_parse_hmtx( metrics, last_metric, out, n + 1 )
+    parse_hmtx( metrics, last_metric, out, n + 1 )
   end
 
 
-# stbtt_FindGlyphIndex
+  # #--------------------------------------------------------
+  # defp parse_loca( loca_data, loca_format, n \\ 0, loca \\ %{} )
+
+  # defp parse_loca( "", _, _, loca ), do: {:ok, loca}
+
+  # defp parse_loca( 
+  #   << offset :: unsigned-size(16)-big, loca_data :: binary >>, :short, n, loca
+  # ) do
+  #   parse_loca( loca_data, :short, n + 1, Map.put(loca, n, offset) )
+  # end
+
+  # defp parse_loca(
+  #   << offset :: unsigned-size(32)-big, loca_data :: binary >>, :long, n, loca
+  # ) do
+  #   parse_loca( loca_data, :long, n + 1, Map.put(loca, n, offset) )
+  # end
+
+  # defp parse_loca( _, _, _, _ ), do: {:error, :loca}
+
+  # #--------------------------------------------------------
+  # # retrieve the bounding box for each glyph
+  # defp parse_glyf_boxes( glyf_data, loca ) do
+  #   {:ok, Enum.reduce(loca, %{}, fn({id,offset}, out) ->
+  #     Map.put(out, id, do_get_glyf_box(glyf_data, offset) )
+  #   end)}
+  # end
+
+  # defp do_get_glyf_box( glyf_data, offset ) do
+  #   <<
+  #     _ :: binary-size(offset),
+  #     _ :: size(16),              # number of contours. dont' care...
+  #     x_min :: signed-size(16)-big,
+  #     y_min :: signed-size(16)-big,
+  #     x_max :: signed-size(16)-big,
+  #     y_max :: signed-size(16)-big,
+  #     _ :: binary
+  #   >> = glyf_data
+  #   {x_min, y_min, x_max, y_max}
+  # end
+
 
   #============================================================================
   # maxp table
   # only care about the number of glyphs
 
-  #--------------------------------------------------------
-  defp parse_maxp( info, font_data ) do
-    with  { :ok, data } <- get_table_data( info, font_data, "maxp" ),
-          {:ok, glyph_count} <- do_parse_maxp( data ) do
-      {:ok, Map.put(info, :glyph_count, glyph_count)}
-    else
-      err ->
-        err
-    end
-  end
+  # #--------------------------------------------------------
+  # defp parse_maxp( info, font_data ) do
+  #   with  { :ok, data } <- get_table_data( info, font_data, "maxp" ),
+  #         {:ok, glyph_count} <- do_parse_maxp( data ) do
+  #     {:ok, Map.put(info, :glyph_count, glyph_count)}
+  #   else
+  #     err ->
+  #       err
+  #   end
+  # end
 
-  #--------------------------------------------------------
-  defp do_parse_maxp( <<
-    @version_one :: binary,
-    glyph_count :: unsigned-integer-size(16)-big,
-    # skip the rest of the table
-    _ :: binary
-  >> ) do
-    {:ok, glyph_count}
-  end
+  # #--------------------------------------------------------
+  # defp do_parse_maxp( <<
+  #   @version_one :: binary,
+  #   glyph_count :: unsigned-integer-size(16)-big,
+  #   # skip the rest of the table
+  #   _ :: binary
+  # >> ) do
+  #   {:ok, glyph_count}
+  # end
 
 
 
@@ -329,15 +412,15 @@ defmodule TruetypeMetrics do
   # cmap table - new version. Return both codepoint -> ind and ind -> codepoint
 
   #--------------------------------------------------------
-  defp parse_cmap_2( info, font_data ) do
-    case get_table_data( info, font_data, "cmap" ) do
-      { :ok, data } -> do_parse_cmap_2( data )
+  defp parse_cmap_glyphs_ids( font_data, tables ) do
+    case get_table_data( font_data, tables, "cmap" ) do
+      { :ok, data } -> do_parse_cmap_glyphs_ids( data )
       err -> err
     end
   end
 
   #--------------------------------------------------------
-  defp do_parse_cmap_2(
+  defp do_parse_cmap_glyphs_ids(
     <<
       0 :: unsigned-integer-size(16)-big,
       num_tables :: unsigned-integer-size(16)-big,
@@ -351,64 +434,53 @@ defmodule TruetypeMetrics do
     # find a sub-table type we understand ( some form of unicode )
     case do_parse_cmap_get_unicode( encoding_types ) do
       {:ok, offset} ->
-        <<
-          _ :: binary-size(offset),
-          cmap :: binary
-        >> = cmap_data
-        do_parse_unicode_cmap( cmap )
+        << _ :: binary-size(offset), cmap :: binary >> = cmap_data
+        do_parse_unicode_cmap_glyphs( cmap )
       _ ->
         {:error, :cmap}
     end
-    |> IO.inspect(label: "do_parse_cmap_get_unicode")
   end
 
   #--------------------------------------------------------
   # table format 0 - single byte. very uncommon now
-  defp do_parse_unicode_cmap(
-    <<
-      0 :: unsigned-integer-size(16)-big,
-      size :: unsigned-integer-size(16)-big,
-      len :: unsigned-integer-size(16)-big,   # length of sub-table
-      language :: unsigned-integer-size(16)-big,
-      sub_table :: binary-size(size),
-      _ :: binary
-    >>
-  ) do
-    pry()
-    do_parse_unicode_cmap_0( sub_table )
-  end
+  # defp do_parse_unicode_cmap_glyphs(
+  #   <<
+  #     0 :: unsigned-integer-size(16)-big,
+  #     size :: unsigned-integer-size(16)-big,
+  #     len :: unsigned-integer-size(16)-big,   # length of sub-table
+  #     language :: unsigned-integer-size(16)-big,
+  #     sub_table :: binary-size(size),
+  #     _ :: binary
+  #   >>
+  # ) do
+  #   pry()
+  #   do_parse_unicode_cmap_0( sub_table )
+  # end
 
   # type 4 - disconnected ranges. ugh. Pretty common tho
-  defp do_parse_unicode_cmap(<<
+  defp do_parse_unicode_cmap_glyphs(<<
     4 :: unsigned-integer-size(16)-big,
-    size :: unsigned-integer-size(16)-big,
-    language :: unsigned-integer-size(16)-big,
+    _size :: unsigned-integer-size(16)-big,
+    _language :: unsigned-integer-size(16)-big,
     seg_count_x2 :: unsigned-integer-size(16)-big,
-    search_range :: unsigned-integer-size(16)-big,
-    entry_selector :: unsigned-integer-size(16)-big,
-    range_shift :: unsigned-integer-size(16)-big,
+    _search_range :: unsigned-integer-size(16)-big,
+    _entry_selector :: unsigned-integer-size(16)-big,
+    _range_shift :: unsigned-integer-size(16)-big,
     end_codes :: binary-size(seg_count_x2),
     0  :: unsigned-integer-size(16)-big,              # reserve pad
     start_codes :: binary-size(seg_count_x2),
     id_deltas :: binary-size(seg_count_x2),
     id_range_offsets :: binary-size(seg_count_x2),
     sub_table :: binary
-  >> = bin) do
-    seg_count = trunc( seg_count_x2 / 2 )
+  >>) do
     ranges = type_4_ranges( start_codes, end_codes, id_deltas, id_range_offsets, seg_count_x2 )
-    count = Enum.reduce(ranges, 0, fn({f,l,_,_,_}, acc) -> acc + l - f + 1 end)
 
-    {codepoints,glyph_ids} = Enum.reduce(ranges, {%{},%{}}, fn
+    glyph_ids = Enum.reduce(ranges, %{}, fn
       {f,l,delta,0,_}, acc ->
         # "relatively" easy case. index is the codepoint - the delta
-        Enum.reduce(f..l, acc, fn(codepoint, {cps,ids}) ->
+        Enum.reduce(f..l, acc, fn(codepoint, ids) ->
           glyph_id = Integer.mod( codepoint + delta, 65536 )
-          if Map.get(cps, codepoint), do: pry()
-          # if Map.get(ids, glyph_id), do: pry()
-          {
-            Map.put(cps, codepoint, glyph_id),
-            Map.put(ids, glyph_id, [codepoint | Map.get(ids, glyph_id, [])])
-          }
+          Map.put(ids, glyph_id, [codepoint | Map.get(ids, glyph_id, [])])
         end)
 
       {f,l,_,offset,compensator}, acc ->
@@ -416,25 +488,18 @@ defmodule TruetypeMetrics do
         # unfortunately, the offset is from *the position in the offsets table*
         # which may allow for a tricky optimization in C, but totally sucks here.
         # to compensate, subtract the pre-calculated compensator
-        Enum.reduce(f..l, acc, fn(codepoint, {cps,ids}) ->
+        Enum.reduce(f..l, acc, fn(codepoint, ids) ->
           skip = ((codepoint - f) * 2) + (offset + compensator)
-          glyph_id = lookup_type_4(sub_table, skip)
-          if Map.get(cps, codepoint), do: pry()
-          # if Map.get(ids, glyph_id), do: pry()
-          {
-            Map.put(cps, codepoint, glyph_id),
-            Map.put(ids, glyph_id, [codepoint | Map.get(ids, glyph_id, [])])
-          }
+          glyph_id = lookup_cmap_type_4(sub_table, skip)
+          Map.put(ids, glyph_id, [codepoint | Map.get(ids, glyph_id, [])])
         end)
     end)
+
+    {:ok, glyph_ids}
   end
 
-  def lookup_type_4( sub_table, skip ) do
-    <<
-      _ :: binary-size(skip),
-      id :: unsigned-size(16)-big,
-      _ :: binary
-    >> = sub_table
+  defp lookup_cmap_type_4( sub_table, skip ) do
+    << _ :: binary-size(skip), id :: unsigned-size(16)-big, _ :: binary >> = sub_table
     id
   end
 
@@ -453,17 +518,13 @@ defmodule TruetypeMetrics do
   #   pry()
   # end
 
-  defp do_parse_unicode_cmap( << type :: unsigned-integer-size(16)-big, _ :: binary >> ) do
-    pry()
-  end
 
 
-
-  defp do_parse_unicode_cmap_0( subtable, n \\ 0, out \\ %{} )
-  defp do_parse_unicode_cmap_0( _, 256, out ), do: out
-  defp do_parse_unicode_cmap_0( << i, bin :: binary >>, n, out ) do
-    do_parse_unicode_cmap_0( bin, n + 1, Map.put( out, n, i ) )
-  end
+  # defp do_parse_unicode_cmap_0( subtable, n \\ 0, out \\ %{} )
+  # defp do_parse_unicode_cmap_0( _, 256, out ), do: out
+  # defp do_parse_unicode_cmap_0( << i, bin :: binary >>, n, out ) do
+  #   do_parse_unicode_cmap_0( bin, n + 1, Map.put( out, n, i ) )
+  # end
 
   defp type_4_ranges( starts, ends, deltas, offsets, remaining_x2, out \\ [] )
   defp type_4_ranges( "", "", "", "", _, out ), do: Enum.reverse(out)
@@ -520,51 +581,51 @@ defmodule TruetypeMetrics do
   # cmap table
   # the point of parsing cmap is to get the supported characters
 
-  #--------------------------------------------------------
-  defp parse_cmap( info, font_data ) do
-    case get_table_data( info, font_data, "cmap" ) do
-      { :ok, data } -> do_parse_cmap( info, data )
-      err -> err
-    end
-  end
+  # #--------------------------------------------------------
+  # defp parse_cmap( info, font_data ) do
+  #   case get_table_data( info, font_data, "cmap" ) do
+  #     { :ok, data } -> do_parse_cmap( info, data )
+  #     err -> err
+  #   end
+  # end
 
-  #--------------------------------------------------------
-  # platform 0 is unicode only - easiest
-  defp do_parse_cmap( info, <<
-    0 :: unsigned-integer-size(16)-big,
-    num_tables :: unsigned-integer-size(16)-big,
-    data :: binary
-  >> = cmap_data ) do
-    # parse out the encoding sub-tables
-    {encoding_types, _data} = do_parse_cmap_encoding_tables( data, num_tables )
-    info = Map.put(info, :cmap, encoding_types)
+  # #--------------------------------------------------------
+  # # platform 0 is unicode only - easiest
+  # defp do_parse_cmap( info, <<
+  #   0 :: unsigned-integer-size(16)-big,
+  #   num_tables :: unsigned-integer-size(16)-big,
+  #   data :: binary
+  # >> = cmap_data ) do
+  #   # parse out the encoding sub-tables
+  #   {encoding_types, _data} = do_parse_cmap_encoding_tables( data, num_tables )
+  #   info = Map.put(info, :cmap, encoding_types)
 
-    # part 2. build the char map
-    # find a sub-table type we understand ( some form of unicode )
-    case do_parse_cmap_get_unicode( encoding_types ) do
-      {:ok, offset} ->
-        <<
-          _ :: binary-size(offset),
-          cmap :: binary
-        >> = cmap_data
+  #   # part 2. build the char map
+  #   # find a sub-table type we understand ( some form of unicode )
+  #   case do_parse_cmap_get_unicode( encoding_types ) do
+  #     {:ok, offset} ->
+  #       <<
+  #         _ :: binary-size(offset),
+  #         cmap :: binary
+  #       >> = cmap_data
 
-        # calculate the text ranges
-        ranges = unicode_cmap_to_ranges( cmap )
-        info = Map.put(info, :ranges, ranges)
+  #       # calculate the text ranges
+  #       ranges = unicode_cmap_to_ranges( cmap )
+  #       info = Map.put(info, :ranges, ranges)
 
-        # calculate the final range string
-        char_space = unicode_ranges_to_string( ranges )
-        {:ok, Map.put(info, :char_space, char_space)}
-      _ ->
-        # just return it as-is
-        {:ok, info}
-    end
+  #       # calculate the final range string
+  #       char_space = unicode_ranges_to_string( ranges )
+  #       {:ok, Map.put(info, :char_space, char_space)}
+  #     _ ->
+  #       # just return it as-is
+  #       {:ok, info}
+  #   end
 
-  end
-  defp do_parse_cmap( _, _ ) do
-    # raise "Invalid Font - failed parsing cmap table. must have a format 0 table"
-    {:error, :invalid_cmap}
-  end
+  # end
+  # defp do_parse_cmap( _, _ ) do
+  #   # raise "Invalid Font - failed parsing cmap table. must have a format 0 table"
+  #   {:error, :invalid_cmap}
+  # end
 
   #----------------------------------------------
   defp do_parse_cmap_get_unicode( %{unicode: %{offset: offset}} ), do: {:ok, offset}
@@ -613,89 +674,89 @@ defmodule TruetypeMetrics do
 
 
 
-  #----------------------------------------------
-  # table format 0 - single byte. very uncommon now
-  defp unicode_cmap_to_ranges(<<
-    0 :: unsigned-integer-size(16)-big,
-    _ :: binary
-  >> ) do
-    [{32, 255}]
-  end
+  # #----------------------------------------------
+  # # table format 0 - single byte. very uncommon now
+  # defp unicode_cmap_to_ranges(<<
+  #   0 :: unsigned-integer-size(16)-big,
+  #   _ :: binary
+  # >> ) do
+  #   [{32, 255}]
+  # end
 
-  # type 4 - disconnected ranges. ugh. Pretty common tho
-  defp unicode_cmap_to_ranges(<<
-    4 :: unsigned-integer-size(16)-big,
-    _size :: unsigned-integer-size(16)-big,
-    _language :: unsigned-integer-size(16)-big,
-    seg_count_x2 :: unsigned-integer-size(16)-big,
-    _search_range :: unsigned-integer-size(16)-big,
-    _entry_selector :: unsigned-integer-size(16)-big,
-    _range_shift :: unsigned-integer-size(16)-big,
-    data :: binary
-  >> ) do
-    seg_count = trunc( seg_count_x2 / 2 )
+  # # type 4 - disconnected ranges. ugh. Pretty common tho
+  # defp unicode_cmap_to_ranges(<<
+  #   4 :: unsigned-integer-size(16)-big,
+  #   _size :: unsigned-integer-size(16)-big,
+  #   _language :: unsigned-integer-size(16)-big,
+  #   seg_count_x2 :: unsigned-integer-size(16)-big,
+  #   _search_range :: unsigned-integer-size(16)-big,
+  #   _entry_selector :: unsigned-integer-size(16)-big,
+  #   _range_shift :: unsigned-integer-size(16)-big,
+  #   data :: binary
+  # >> ) do
+  #   seg_count = trunc( seg_count_x2 / 2 )
 
-    # get the end codes
-    {end_codes, data} = parse_cmap4_codes(data, seg_count)
+  #   # get the end codes
+  #   {end_codes, data} = parse_cmap4_codes(data, seg_count)
 
-    # skip the reserved pad
-    << 0 :: unsigned-integer-size(16)-big, data :: binary >> = data
+  #   # skip the reserved pad
+  #   << 0 :: unsigned-integer-size(16)-big, data :: binary >> = data
 
-    # get the start coces
-    {start_codes, _data} = parse_cmap4_codes(data, seg_count)
+  #   # get the start coces
+  #   {start_codes, _data} = parse_cmap4_codes(data, seg_count)
 
-    # zip the start and end codes together for a range list
-    Enum.zip(start_codes, end_codes)
-  end
+  #   # zip the start and end codes together for a range list
+  #   Enum.zip(start_codes, end_codes)
+  # end
 
-  # type 6 - densly mapped relatively easy
-  defp unicode_cmap_to_ranges(<<
-    6 :: unsigned-integer-size(16)-big,
-    _size :: unsigned-integer-size(16)-big,
-    _language :: unsigned-integer-size(16)-big,
-    start_code :: unsigned-integer-size(16)-big,
-    num_codes :: unsigned-integer-size(16)-big,
-    _ :: binary
-  >> ) do
-    [{start_code, start_code + num_codes}]
-  end
+  # # type 6 - densly mapped relatively easy
+  # defp unicode_cmap_to_ranges(<<
+  #   6 :: unsigned-integer-size(16)-big,
+  #   _size :: unsigned-integer-size(16)-big,
+  #   _language :: unsigned-integer-size(16)-big,
+  #   start_code :: unsigned-integer-size(16)-big,
+  #   num_codes :: unsigned-integer-size(16)-big,
+  #   _ :: binary
+  # >> ) do
+  #   [{start_code, start_code + num_codes}]
+  # end
 
 
-  #----------------------------------------------
-  defp unicode_ranges_to_string( ranges ) do
-    Enum.reduce(ranges, [], fn({range_start, range_end}, acc) ->
-      Enum.reduce(range_start .. range_end, acc, fn(ch, acc) ->
-        cond do
-#          ch < 32 -> acc                        # control
-#          ch >= 0x7F && ch <= 0x9F -> acc       # control other
-          ch >= 65535 -> acc                    # too high
-          true ->
-            chs = << ch :: utf8 >>
-            [chs | acc]
-        end
-      end)
-    end)
-    |> Enum.reverse
-    |> to_string()
-  end
+#   #----------------------------------------------
+#   defp unicode_ranges_to_string( ranges ) do
+#     Enum.reduce(ranges, [], fn({range_start, range_end}, acc) ->
+#       Enum.reduce(range_start .. range_end, acc, fn(ch, acc) ->
+#         cond do
+# #          ch < 32 -> acc                        # control
+# #          ch >= 0x7F && ch <= 0x9F -> acc       # control other
+#           ch >= 65535 -> acc                    # too high
+#           true ->
+#             chs = << ch :: utf8 >>
+#             [chs | acc]
+#         end
+#       end)
+#     end)
+#     |> Enum.reverse
+#     |> to_string()
+#   end
 
-  #----------------------------------------------
-  defp parse_cmap4_codes(data, count, codes \\ [])
-  defp parse_cmap4_codes(data, 0, codes), do: {Enum.reverse(codes), data}
-  defp parse_cmap4_codes(
-    << code :: unsigned-integer-size(16)-big, data :: binary >>, count, codes
-  ) do
-    parse_cmap4_codes(data, count - 1, [code | codes])
-  end
+  # #----------------------------------------------
+  # defp parse_cmap4_codes(data, count, codes \\ [])
+  # defp parse_cmap4_codes(data, 0, codes), do: {Enum.reverse(codes), data}
+  # defp parse_cmap4_codes(
+  #   << code :: unsigned-integer-size(16)-big, data :: binary >>, count, codes
+  # ) do
+  #   parse_cmap4_codes(data, count - 1, [code | codes])
+  # end
 
   #============================================================================
   # kerning table
 
   #--------------------------------------------------------
-  defp parse_kern( font_data, tables ) do
+  defp parse_kern( font_data, tables, glyph_ids ) do
     case get_table_data( font_data, tables, "kern" ) do
-      { :ok, data } -> do_parse_kern( data )
-      err -> {:ok, %{}}
+      { :ok, data } -> do_parse_kern( data, glyph_ids )
+      _ -> {:ok, %{}}
     end
   end
 
@@ -711,30 +772,35 @@ defmodule TruetypeMetrics do
     _entry_selector :: unsigned-integer-size(16)-big,
     _range_shift :: unsigned-integer-size(16)-big,
     data :: binary
-  >> ) do
-    do_parse_kern_0_entry( data )
+  >>, glyph_ids ) do
+    do_parse_kern_0_entry( data, glyph_ids )
   end
-  def do_parse_kern_0_entry( kern_data, pairs \\ %{} )
-  def do_parse_kern_0_entry( <<>>, pairs ), do: {:ok, pairs}
-  def do_parse_kern_0_entry( <<
+  defp do_parse_kern_0_entry( kern_data, glyph_ids, pairs \\ %{} )
+  defp do_parse_kern_0_entry( <<>>, _, pairs ), do: {:ok, pairs}
+  defp do_parse_kern_0_entry( <<
     left :: unsigned-integer-size(16)-big,
     right :: unsigned-integer-size(16)-big,
     value :: signed-integer-size(16)-big,
     kern_data :: binary
-  >>, pairs ) do
-    # type 0 has only x information, so set y to 0
-    pairs = Map.put( pairs, {left, right}, {value, 0})
-    do_parse_kern_0_entry( kern_data, pairs )
+  >>, glyph_ids, pairs ) do
+
+    # the given pair is to glyph_id. which might point to more than one
+    # codepoint. We want codepoint pairs, so need to expand this into
+    # codepoint space, then add each to the pairs map.
+    with {:ok, left_cps} <- Map.fetch( glyph_ids, left ),
+    {:ok, right_cps} <- Map.fetch( glyph_ids, right ) do
+      pairs = Enum.reduce(left_cps, [], fn(left_cp, acc) ->
+        Enum.reduce(right_cps, acc, fn(right_cp, acc) ->
+          [ {left_cp, right_cp} | acc ]
+        end)
+      end)
+      |> Enum.reduce( pairs, &Map.put(&2, &1, value) )
+      # pairs = Map.put( pairs, {left, right}, value)
+      do_parse_kern_0_entry( kern_data, glyph_ids, pairs )
+    else
+      _ -> do_parse_kern_0_entry( kern_data, glyph_ids, pairs )
+    end
   end
-
-
-  #============================================================================
-  # utilities
-
-  defp collapse_ranges( ranges ) when is_list(ranges) do
-
-  end
-
 
   #============================================================================
   # utilities
@@ -781,13 +847,13 @@ defmodule TruetypeMetrics do
   def get_table_data( font_data, tables, "head" ) when is_binary(font_data) do
     case Map.get(tables, "head") do
       nil -> {:error, :missing_table, "head"}
-      %{offset: offset, size: table_size, checksum: check} ->
+      %{offset: offset, size: table_size} ->
         <<
           _ :: binary-size(offset),
           table_data :: binary-size(table_size),
           _ :: binary
         >> = font_data
-        {:ok, table_data, check}
+        {:ok, table_data}
     end
   end
 
