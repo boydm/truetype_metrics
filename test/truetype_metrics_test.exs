@@ -15,27 +15,27 @@ defmodule TruetypeMetricsTest do
 
   test "checksum works - no padding" do
     # make sure it tests all the lengths needing padding
-    assert TruetypeMetrics.checksum("ioaerpiuha3q23rhjlaiueyaiq34hfkjanglhadf") == 4058887661
+    assert TruetypeMetrics.test_checksum("ioaerpiuha3q23rhjlaiueyaiq34hfkjanglhadf") == 4058887661
   end
 
   test "checksum works, pad 3" do
     # make sure it tests all the lengths needing padding
-    assert TruetypeMetrics.checksum("ioaerpiuha3q23rhjlaiueyaiq34hfkjanglhadfg") == 1491973613
+    assert TruetypeMetrics.test_checksum("ioaerpiuha3q23rhjlaiueyaiq34hfkjanglhadfg") == 1491973613
   end
 
   test "checksum works, pad 2" do
     # make sure it tests all the lengths needing padding
-    assert TruetypeMetrics.checksum("ioaerpiuha3q23rhjlaiueyaiq34hfkjanglhadfgh") == 1498789357
+    assert TruetypeMetrics.test_checksum("ioaerpiuha3q23rhjlaiueyaiq34hfkjanglhadfgh") == 1498789357
   end
 
   test "checksum works, pad 1" do
     # make sure it tests all the lengths needing padding
-    assert TruetypeMetrics.checksum("ioaerpiuha3q23rhjlaiueyaiq34hfkjanglhadfghl") == 1498817005
+    assert TruetypeMetrics.test_checksum("ioaerpiuha3q23rhjlaiueyaiq34hfkjanglhadfghl") == 1498817005
   end
   
   test "checksum deals with an empty binary" do
     # make sure it tests all the lengths needing padding
-    assert TruetypeMetrics.checksum("") == 0
+    assert TruetypeMetrics.test_checksum("") == 0
   end
 
   #============================================================================
@@ -43,14 +43,11 @@ defmodule TruetypeMetricsTest do
 
   test "loads the Roboto-Regular file" do
     {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.load( @roboto )
-    assert metrics.bounding_box == {-1509, -555, 3861, 2718}
+    assert metrics.max_box == {-1509, -555, 2352, 2163}
     assert metrics.units_per_em == 2048
     assert metrics.smallest_ppem == 9
     assert metrics.direction == 2
-    assert metrics.glyph_count == 1294
-    refute metrics.kerning
-    assert is_list(metrics.ranges)
-    assert metrics.style == :bold
+    assert metrics.kerning == %{}
 
     assert metrics.source.signature_type == :sha256
     signature = :crypto.hash( :sha256, File.read!(@roboto) )
@@ -73,14 +70,11 @@ defmodule TruetypeMetricsTest do
 
   test "loads the Bitter-Regular file" do
     {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.load( @bitter )
-    assert metrics.bounding_box == {-60, -265, 1185, 1200}
+    assert metrics.max_box == {-60, -265, 1125, 935}
     assert metrics.units_per_em == 1000
     assert metrics.smallest_ppem == 9
     assert metrics.direction == 2
-    assert metrics.glyph_count == 256
-    assert metrics.kerning[{36, 52}] == {-15, 0}
-    assert is_list(metrics.ranges)
-    assert metrics.style == :bold
+    assert metrics.kerning[{66, 65}] == -30
 
     assert metrics.source.signature_type == :sha256
     signature = :crypto.hash( :sha256, File.read!(@bitter) )
