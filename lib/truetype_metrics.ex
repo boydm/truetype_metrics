@@ -27,8 +27,8 @@ defmodule TruetypeMetrics do
   @signature_type       FontMetrics.expected_hash()
 
 
-  def go(), do: load( "test/fonts/Roboto/Roboto-Regular.ttf")
-  # def go(), do: load( "test/fonts/Bitter/Bitter-Regular.ttf")
+  # def go(), do: load( "test/fonts/Roboto/Roboto-Regular.ttf")
+  def go(), do: load( "test/fonts/Bitter/Bitter-Regular.ttf")
 
   #============================================================================
   # test-only accessor
