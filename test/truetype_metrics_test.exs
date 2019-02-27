@@ -65,6 +65,15 @@ defmodule TruetypeMetricsTest do
     assert metrics.source.signature == signature
   end
 
+  test "load! loads directly" do
+    %FontMetrics{} = TruetypeMetrics.load!( @roboto )
+  end
+
+  test "parse! parses directly" do
+    font_data = File.read!( @roboto )
+    %FontMetrics{} = TruetypeMetrics.parse!( font_data )
+  end
+
   #============================================================================
   # bitter - has a kerning table...
 

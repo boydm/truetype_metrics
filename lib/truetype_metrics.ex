@@ -10,7 +10,6 @@ defmodule TruetypeMetrics do
 
   @version            "0.1.0"
 
-
   @version_one          <<0, 1, 0, 0>>
   @magic_number_bin     <<0x5F, 0x0F, 0x3C, 0xF5>>
 
@@ -28,20 +27,15 @@ defmodule TruetypeMetrics do
   @signature_type       FontMetrics.expected_hash()
 
 
-  #============================================================================
-  # environment specific headers
-  # the go() function is a shortcut for me during dev
-  # the test_* functions are to access otherwise private functions during test
-  # yes. I know this is a debatable technique, but I really want to test some
-  # of these functions in isolation without exposing them as a general api.
-  case Mix.env() do
-    :dev ->
-      # def go(), do: load( "test/fonts/Bitter/Bitter-Regular.ttf")
-      def go(), do: load( "test/fonts/Roboto/Roboto-Regular.ttf")
-    :test ->
-      def test_checksum( data ), do: checksum( data )
+  def go(), do: load( "test/fonts/Roboto/Roboto-Regular.ttf")
+  # def go(), do: load( "test/fonts/Bitter/Bitter-Regular.ttf")
 
-    _ -> :ok
+  #============================================================================
+  # test-only accessor
+  # Yes. I know this is a debatable technique, but I really want to test the
+  # checksum directly yet not expose it as a general api.
+  if Mix.env() == :test do
+    def test_checksum( data ), do: checksum( data )
   end
 
   #============================================================================
