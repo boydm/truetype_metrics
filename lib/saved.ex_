@@ -1,0 +1,144 @@
+functions that I wrote while figuring out how to parse TrueType files.
+
+Not using them - for now, but don't want to straight-up delte them either.
+Parking them here.
+
+
+  # #--------------------------------------------------------
+  # defp parse_loca( loca_data, loca_format, n \\ 0, loca \\ %{} )
+
+  # defp parse_loca( "", _, _, loca ), do: {:ok, loca}
+
+  # defp parse_loca( 
+  #   << offset :: unsigned-size(16)-big, loca_data :: binary >>, :short, n, loca
+  # ) do
+  #   parse_loca( loca_data, :short, n + 1, Map.put(loca, n, offset) )
+  # end
+
+  # defp parse_loca(
+  #   << offset :: unsigned-size(32)-big, loca_data :: binary >>, :long, n, loca
+  # ) do
+  #   parse_loca( loca_data, :long, n + 1, Map.put(loca, n, offset) )
+  # end
+
+  # defp parse_loca( _, _, _, _ ), do: {:error, :loca}
+
+  # #--------------------------------------------------------
+  # # retrieve the bounding box for each glyph
+  # defp parse_glyf_boxes( glyf_data, loca ) do
+  #   {:ok, Enum.reduce(loca, %{}, fn({id,offset}, out) ->
+  #     Map.put(out, id, do_get_glyf_box(glyf_data, offset) )
+  #   end)}
+  # end
+
+  # defp do_get_glyf_box( glyf_data, offset ) do
+  #   <<
+  #     _ :: binary-size(offset),
+  #     _ :: size(16),              # number of contours. dont' care...
+  #     x_min :: signed-size(16)-big,
+  #     y_min :: signed-size(16)-big,
+  #     x_max :: signed-size(16)-big,
+  #     y_max :: signed-size(16)-big,
+  #     _ :: binary
+  #   >> = glyf_data
+  #   {x_min, y_min, x_max, y_max}
+  # end
+
+
+  #============================================================================
+  # maxp table
+  # only care about the number of glyphs
+
+  # #--------------------------------------------------------
+  # defp parse_maxp( info, font_data ) do
+  #   with  { :ok, data } <- get_table_data( info, font_data, "maxp" ),
+  #         {:ok, glyph_count} <- do_parse_maxp( data ) do
+  #     {:ok, Map.put(info, :glyph_count, glyph_count)}
+  #   else
+  #     err ->
+  #       err
+  #   end
+  # end
+
+  # #--------------------------------------------------------
+  # defp do_parse_maxp( <<
+  #   @version_one :: binary,
+  #   glyph_count :: unsigned-integer-size(16)-big,
+  #   # skip the rest of the table
+  #   _ :: binary
+  # >> ) do
+  #   {:ok, glyph_count}
+  # end
+
+
+
+#   #----------------------------------------------
+#   defp unicode_ranges_to_string( ranges ) do
+#     Enum.reduce(ranges, [], fn({range_start, range_end}, acc) ->
+#       Enum.reduce(range_start .. range_end, acc, fn(ch, acc) ->
+#         cond do
+# #          ch < 32 -> acc                        # control
+# #          ch >= 0x7F && ch <= 0x9F -> acc       # control other
+#           ch >= 65535 -> acc                    # too high
+#           true ->
+#             chs = << ch :: utf8 >>
+#             [chs | acc]
+#         end
+#       end)
+#     end)
+#     |> Enum.reverse
+#     |> to_string()
+#   end
+
+
+
+
+#============================================================================
+  # cmap table
+  # the point of parsing cmap is to get the supported characters
+
+  # #--------------------------------------------------------
+  # defp parse_cmap( info, font_data ) do
+  #   case get_table_data( info, font_data, "cmap" ) do
+  #     { :ok, data } -> do_parse_cmap( info, data )
+  #     err -> err
+  #   end
+  # end
+
+  # #--------------------------------------------------------
+  # # platform 0 is unicode only - easiest
+  # defp do_parse_cmap( info, <<
+  #   0 :: unsigned-integer-size(16)-big,
+  #   num_tables :: unsigned-integer-size(16)-big,
+  #   data :: binary
+  # >> = cmap_data ) do
+  #   # parse out the encoding sub-tables
+  #   {encoding_types, _data} = do_parse_cmap_encoding_tables( data, num_tables )
+  #   info = Map.put(info, :cmap, encoding_types)
+
+  #   # part 2. build the char map
+  #   # find a sub-table type we understand ( some form of unicode )
+  #   case do_parse_cmap_get_unicode( encoding_types ) do
+  #     {:ok, offset} ->
+  #       <<
+  #         _ :: binary-size(offset),
+  #         cmap :: binary
+  #       >> = cmap_data
+
+  #       # calculate the text ranges
+  #       ranges = unicode_cmap_to_ranges( cmap )
+  #       info = Map.put(info, :ranges, ranges)
+
+  #       # calculate the final range string
+  #       char_space = unicode_ranges_to_string( ranges )
+  #       {:ok, Map.put(info, :char_space, char_space)}
+  #     _ ->
+  #       # just return it as-is
+  #       {:ok, info}
+  #   end
+
+  # end
+  # defp do_parse_cmap( _, _ ) do
+  #   # raise "Invalid Font - failed parsing cmap table. must have a format 0 table"
+  #   {:error, :invalid_cmap}
+  # end
