@@ -8,6 +8,8 @@ defmodule TruetypeMetrics do
   Documentation for TruetypeMetrics.
   """
 
+  import IEx
+
   @version            "0.1.0"
 
   @version_one          <<0, 1, 0, 0>>
@@ -26,12 +28,11 @@ defmodule TruetypeMetrics do
 
   @signature_type       FontMetrics.expected_hash()
 
-
-  # def go(), do: load( "test/fonts/Roboto/Roboto-Regular.ttf")
-  def go(), do: load( "test/fonts/Bitter/Bitter-Regular.ttf")
+  # def go(), do: load( "test/fonts/Roboto/Roboto-Regular.ttf" )
+  # def go(), do: load( "test/fonts/Bitter/Bitter-Regular.ttf" )
 
   #============================================================================
-  # test-only accessor
+  # test-only accessors
   # Yes. I know this is a debatable technique, but I really want to test the
   # checksum directly yet not expose it as a general api.
   if Mix.env() == :test do
@@ -45,7 +46,7 @@ defmodule TruetypeMetrics do
   # inspect a ttf font. Is limited. Returns a map of font info
   def load( font_path ) when is_bitstring(font_path) do
     case File.read( font_path ) do
-      {:ok, raw_font} -> parse( raw_font )
+      {:ok, raw_font} -> parse( raw_font, Path.basename(font_path) )
       err -> err
     end
   end
@@ -53,7 +54,7 @@ defmodule TruetypeMetrics do
   #--------------------------------------------------------
   # inspect a ttf font. Is limited. Returns a map of font info
   def load!( font_path ) when is_bitstring(font_path) do
-    File.read!( font_path ) |> parse!()
+    File.read!( font_path ) |> parse!( Path.basename(font_path) )
   end
 
   #--------------------------------------------------------
@@ -65,7 +66,7 @@ defmodule TruetypeMetrics do
     _entry_selector :: unsigned-integer-size(16)-big,
     _range_shift :: unsigned-integer-size(16)-big,
     table_data :: binary
-  >> = font_data ) do
+  >> = font_data, file_name ) do
 
     # parse out all the pieces
     with {:ok, tables} <- parse_tables( table_data, table_count ),
@@ -87,7 +88,8 @@ defmodule TruetypeMetrics do
           signature: signature,
           created_at: head.created,
           modified_at: head.modified,          
-          font_type: "TrueType"
+          font_type: :true_type,
+          file: file_name
         },
         direction: head.direction,
         smallest_ppem: head.smallest_ppem,
@@ -104,10 +106,10 @@ defmodule TruetypeMetrics do
       err -> err
     end
   end
-  def parse( _d ), do: @invalid_font
+  def parse( _d, _ ), do: @invalid_font
 
-  def parse!( data ) do
-    {:ok, metrics} = parse(data)
+  def parse!( data, file_name ) do
+    {:ok, metrics} = parse(data, file_name)
     metrics
   end
 
@@ -215,17 +217,23 @@ defmodule TruetypeMetrics do
     {:ok, hmtx} <- parse_hmtx( data, hhea.num_h_metrics - 1 ) do
       # combine it all together..
 
-      # first, get the default character advance
-      {default_advance, _lsb} = hmtx[0]
-
       # The id points to a glyph. We want to point to codepoints
       metrics = Enum.reduce(glyph_ids, %{}, fn({id,codepoints}, out) ->
-        adv = case hmtx[id] do
-          nil -> default_advance
-          {adv, _} -> adv
+        case hmtx[id] do
+          nil -> out
+          {adv, _} -> Enum.reduce(codepoints, out, &Map.put(&2, &1, adv) )
         end
-        Enum.reduce(codepoints, out, &Map.put(&2, &1, adv) )
       end)
+
+      # get the default advance
+      default_advance = metrics[0xffff] || metrics[0]
+
+      # scan metrics one more time to remove dupes of default_advance
+      metrics = Enum.reduce(metrics, metrics, fn
+        {cp,^default_advance}, m -> Map.delete(m, cp)
+        _, m -> m
+      end)
+      |> Map.put( 0, default_advance )
 
       {:ok, hhea, metrics}
 
@@ -278,6 +286,16 @@ defmodule TruetypeMetrics do
   #--------------------------------------------------------
   defp parse_hmtx( metrics, last_metric, out \\ %{}, n \\ 0 )
 
+  defp parse_hmtx( "", _, out, _ ), do: {:ok, out}
+
+  defp parse_hmtx(
+    << advance_width :: signed-integer-size(16)-big, >>,
+    last_metric, out, n 
+  ) do
+    out = Map.put(out, :default, {advance_width, 0})
+    {:ok, out}
+  end
+
   defp parse_hmtx(
     <<
       advance_width :: signed-integer-size(16)-big,
@@ -300,6 +318,7 @@ defmodule TruetypeMetrics do
     out = Map.put(out, n, {advance_width, lsb})
     parse_hmtx( metrics, last_metric, out, n + 1 )
   end
+
 
 
   #============================================================================
@@ -540,7 +559,13 @@ defmodule TruetypeMetrics do
   defp check_master_checksum( bin, adjustment ) do
     case (0xB1B0AFBA - checksum(bin, adjustment)) do
       ^adjustment -> :ok
-      _ -> {:error, :invalid_file}
+      sum ->
+        # in C, the above subtraction rolls over in unsigned integer math
+        # simulate that here.
+        case 0xFFffFFff + sum + 1 do
+          ^adjustment -> :ok
+          _ -> {:error, :checksum}
+        end
     end
   end
 
