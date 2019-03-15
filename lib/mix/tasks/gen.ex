@@ -37,7 +37,6 @@ defmodule Mix.Tasks.TruetypeMetrics do
 
   @doc false
   def run(argv) do
-    IO.inspect(argv, label: "argv")
     {opts,dirs} = OptionParser.parse!(argv, aliases: @aliases, strict: @switches)
     source = (Enum.at(dirs, 0) || File.cwd!())
     |> Path.expand()
