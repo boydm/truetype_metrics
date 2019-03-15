@@ -1,6 +1,6 @@
 # TruetypeMetrics
 
-**TODO: Add description**
+Parses a TrueType font and builds a `%FontMetrics{}` term that can be used in Scenic.
 
 ## Installation
 
@@ -10,7 +10,7 @@ by adding `truetype_metrics` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:truetype_metrics, "~> 0.1.0"}
+    {:truetype_metrics, "~> 0.3"}
   ]
 end
 ```
