@@ -9,7 +9,7 @@ defmodule Mix.Tasks.TruetypeMetricsTest do
 
   alias Mix.Tasks.TruetypeMetrics, as: Gen
 
-  import IEx
+  # import IEx
 
   @dst        "test/dst"
   @src        "test/src"

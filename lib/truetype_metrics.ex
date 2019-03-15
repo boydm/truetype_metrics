@@ -8,7 +8,7 @@ defmodule TruetypeMetrics do
   Documentation for TruetypeMetrics.
   """
 
-  import IEx
+  # import IEx
 
   @version            "0.1.0"
 
@@ -289,8 +289,7 @@ defmodule TruetypeMetrics do
   defp parse_hmtx( "", _, out, _ ), do: {:ok, out}
 
   defp parse_hmtx(
-    << advance_width :: signed-integer-size(16)-big, >>,
-    last_metric, out, n 
+    << advance_width :: signed-integer-size(16)-big >>, _, out, _
   ) do
     out = Map.put(out, :default, {advance_width, 0})
     {:ok, out}

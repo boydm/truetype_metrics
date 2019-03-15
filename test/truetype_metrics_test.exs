@@ -53,12 +53,12 @@ defmodule TruetypeMetricsTest do
     signature = :crypto.hash( :sha256, File.read!(@roboto) )
     |> Base.url_encode64(padding: false)
     assert metrics.source.signature == signature
-    assert metrics.source.font_type == "TrueType"
+    assert metrics.source.font_type == :true_type
   end
 
   test "parses the Roboto-Regular file" do
     font_data = File.read!( @roboto )
-    {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.parse( font_data )
+    {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.parse( font_data, "Roboto-Regular.ttf" )
     assert metrics.source.signature_type == :sha256
     signature = :crypto.hash( :sha256, font_data )
     |> Base.url_encode64(padding: false)
@@ -71,7 +71,7 @@ defmodule TruetypeMetricsTest do
 
   test "parse! parses directly" do
     font_data = File.read!( @roboto )
-    %FontMetrics{} = TruetypeMetrics.parse!( font_data )
+    %FontMetrics{} = TruetypeMetrics.parse!( font_data, "Roboto-Regular.ttf" )
   end
 
   #============================================================================
@@ -89,12 +89,12 @@ defmodule TruetypeMetricsTest do
     signature = :crypto.hash( :sha256, File.read!(@bitter) )
     |> Base.url_encode64(padding: false)
     assert metrics.source.signature == signature
-    assert metrics.source.font_type == "TrueType"
+    assert metrics.source.font_type == :true_type
   end
 
   test "parses the Bitter-Regular file" do
     font_data = File.read!( @bitter )
-    {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.parse( font_data )
+    {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.parse( font_data, "Bitter-Regular.ttf" )
     assert metrics.source.signature_type == :sha256
     signature = :crypto.hash( :sha256, font_data )
     |> Base.url_encode64(padding: false)
@@ -107,7 +107,8 @@ defmodule TruetypeMetricsTest do
 
   test "Checks overall internal file hash" do
     font_data = File.read!( @bitter ) <> "extra data"
-    assert TruetypeMetrics.parse( font_data ) == {:error, :invalid_file}
+    assert TruetypeMetrics.parse( font_data, "Bitter-Regular.ttf" ) ==
+      {:error, :checksum}
   end
 
 end

@@ -21,7 +21,7 @@ defmodule Mix.Tasks.TruetypeMetrics do
       >> created RobotoMono-Regular.ttf.metrics
       >> created RobotoSlab-Regular.ttf.metrics
   """
-  import IEx
+  # import IEx
 
   @switches [
     recurse: :boolean,
