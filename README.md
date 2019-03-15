@@ -1,6 +1,8 @@
 # TruetypeMetrics
 
-Parses a TrueType font and builds a `%FontMetrics{}` term that can be used in Scenic.
+Parses a TrueType font and builds a `%FontMetrics{}` term.
+
+Meant to be used the [FontMetrics](https://github.com/boydm/font_metrics) package, which is intended for use in Scenic, but doesn't require it.
 
 ## Installation
 
