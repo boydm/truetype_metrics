@@ -45,7 +45,7 @@ defmodule TruetypeMetrics.MixProject do
 
   defp docs do
     [
-      main: "Mix.Tashs.TruetypeMetrics.html",
+      main: "Mix.Tasks.TruetypeMetrics",
       source_ref: "v#{@version}",
       source_url: "https://github.com/boydm/truetype_metrics"
       # homepage_url: "http://kry10.com",
