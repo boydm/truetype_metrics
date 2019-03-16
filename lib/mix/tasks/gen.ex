@@ -38,20 +38,17 @@ defmodule Mix.Tasks.TruetypeMetrics do
   @doc false
   def run(argv) do
     {opts,dirs} = OptionParser.parse!(argv, aliases: @aliases, strict: @switches)
-    source = (Enum.at(dirs, 0) || File.cwd!())
-    |> Path.expand()
-    destination = (Enum.at(dirs, 1) || File.cwd!())
+    path = (Enum.at(dirs, 0) || File.cwd!())
     |> Path.expand()
 
-    with {:ok, src} <- validate_src(source),
-    {:ok, dst} <- validate_dst(destination) do
-    put_msg("")
-    put_msg("Generating metrics for #{src}")
-    put_msg("")
+    with {:ok, path} <- validate_path(path) do
+      put_msg("")
+      put_msg("Generating metrics for #{path}")
+      put_msg("")
 
-      case File.dir?(src) do
-        true -> gen_dir( src, dst, opts )
-        false -> gen_file( src, dst, opts )
+      case File.dir?(path) do
+        true -> gen_dir( path, opts )
+        false -> gen_file( path, opts )
       end
 
       put_msg("")
@@ -59,34 +56,42 @@ defmodule Mix.Tasks.TruetypeMetrics do
   end
 
   #--------------------------------------------------------
-  defp gen_dir(src, dst, opts) do
-    File.ls!(src)
+  defp gen_dir(path, opts) do
+    File.ls!(path)
     |> Enum.each(fn sub_path ->
-      p = Path.join(src, sub_path)
+      p = Path.join(path, sub_path)
       case File.dir?(p) do
         true ->
           if opts[:recurse] do
-            gen_dir(p, dst, opts)
+            gen_dir(p, opts)
           end
         false ->
-          gen_file( p, dst, opts )
+          gen_file( p, opts )
       end
     end)
   end
 
   #--------------------------------------------------------
-  defp gen_file(src, dst, _opts) do
-    file = Path.basename(src)
-    path_out = Path.join(dst, file <> ".metrics" )
+  defp gen_file(src, opts) do
+    path_out = src <> ".metrics"
 
     with {:ok, fm} <- TruetypeMetrics.load( src ),
     {:ok, bin} <- FontMetrics.to_binary( fm ),
     :ok <- File.write( path_out, bin ) do
-    # :ok <- File.rename(path, path <> ".#{fm.source.signature}") do
+      # convenience hash of the metrics file
       sha = :crypto.hash(:sha, bin)
       |> Base.url_encode64(padding: false)
       put_msg "* created #{path_out}, sha: #{sha}"
-      put_msg "* renamed #{src} to #{src <> ".#{fm.source.signature}"}"
+
+      # deocorate the font if requested
+      if opts[:decorate_font] do
+        if File.rename(src, src <> ".#{fm.source.signature}") == :ok do
+          put_msg "* renamed #{src} to #{src <> ".#{fm.source.signature}"}"
+        else
+          put_msg "* failed to decorate #{src}"                
+        end
+      end
+
       put_msg ""
     else
       err ->
@@ -99,7 +104,7 @@ defmodule Mix.Tasks.TruetypeMetrics do
   end
 
   #--------------------------------------------------------
-  defp validate_src(path) do
+  defp validate_path(path) do
     case File.exists?(path) do
       true ->
         {:ok, path}
@@ -107,7 +112,7 @@ defmodule Mix.Tasks.TruetypeMetrics do
       false ->
         put_msg(
           IO.ANSI.red() <>
-          "Invalid Source: \"#{path}\"" <>
+          "Invalid location: \"#{path}\"" <>
           IO.ANSI.default_color()
         )
         :error
@@ -115,20 +120,20 @@ defmodule Mix.Tasks.TruetypeMetrics do
   end
 
   #--------------------------------------------------------
-  defp validate_dst(path) do
-    case File.dir?(path) do
-      true ->
-        {:ok, path}
+  # defp validate_path(path) do
+  #   case File.dir?(path) do
+  #     true ->
+  #       {:ok, path}
 
-      false ->
-        put_msg(
-          IO.ANSI.red() <>
-          "Invalid Destination Directory: \"#{path}\"" <>
-          IO.ANSI.default_color()
-        )
-        :error
-    end
-  end
+  #     false ->
+  #       put_msg(
+  #         IO.ANSI.red() <>
+  #         "Invalid Destination Directory: \"#{path}\"" <>
+  #         IO.ANSI.default_color()
+  #       )
+  #       :error
+  #   end
+  # end
 
   #--------------------------------------------------------
   defp put_msg( msg ) do
