@@ -21,7 +21,8 @@ defmodule TruetypeMetrics.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       docs: docs(),
-      package: package()
+      package: package(),
+      description: description()
     ]
   end
 
@@ -60,5 +61,11 @@ defmodule TruetypeMetrics.MixProject do
       licenses: ["Apache 2"],
       links: %{Github: @github}
     ]
+  end
+
+  defp description do
+    """
+    TrueType_Metrics -- Parse TrueType fonts and generate metrics data.
+    """
   end
 end
