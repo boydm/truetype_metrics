@@ -35,7 +35,7 @@ defmodule TruetypeMetrics.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:font_metrics, path: "../font_metrics"},
+      {:font_metrics, "~> 0.3"},
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:excoveralls, ">= 0.0.0", only: :test, runtime: false},
       {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
