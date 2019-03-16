@@ -4,7 +4,7 @@
 
 Parses a TrueType font and builds a `%FontMetrics{}` term.
 
-Meant to be used the [FontMetrics](https://github.com/boydm/font_metrics) package, which is intended for use in Scenic, but doesn't require it.
+Meant to be used with the [FontMetrics](https://github.com/boydm/font_metrics) package.
 
 ## Installation
 
