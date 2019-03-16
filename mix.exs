@@ -36,7 +36,11 @@ defmodule TruetypeMetrics.MixProject do
   defp deps do
     [
       { :font_metrics, path: "../font_metrics" },
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+
+      {:ex_doc, ">= 0.0.0", only: :dev},
+      {:excoveralls, ">= 0.0.0", only: :test, runtime: false},
+      {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
+      {:inch_ex, "~> 2.0", only: [:dev, :docs], runtime: false}
     ]
   end
 

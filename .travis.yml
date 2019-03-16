@@ -1,0 +1,20 @@
+language: elixir
+sudo: true
+
+elixir:
+  - 1.8
+otp_release:
+  - 21.0
+
+before_script:
+  - mix local.hex --force
+  - mix deps.get --only test
+script:
+  - mix test
+  - mix format --check-formatted
+  - mix coveralls.json
+after_script:
+  - MIX_ENV=docs mix deps.get
+  - MIX_ENV=docs mix inch.report
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
