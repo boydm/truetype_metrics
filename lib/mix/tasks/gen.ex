@@ -7,29 +7,54 @@ defmodule Mix.Tasks.TruetypeMetrics do
   @moduledoc """
   Generate a metrics file for a TrueType font.
 
-  example:
+  The truetype_metrics package is for use with the font_metrics package.
+  It parses TrueType files and creates %FontMetrics{} structs that can be used
+  in Scenic to work with fonts. It is not, however dependent on Scenic, you can
+  use this elsewhere.
 
-      mix truetype_metrics Roboto-Regular.ttf
+  You can call the module APIs if you want, but truetype_metrics is typically
+  used as a command line tool.
 
-      >> create Roboto-Regular.ttf.metrics
+  ## Installation
 
-  You can also point it at a directory to have it generate metrics for all the fonts within
+  You could take a dependency on truetype_metrics in code if you want, but it is
+  usually used as an installed archive.
 
-      mix truetype_metrics fonts
-      
-      >> created Roboto-Regular.ttf.metrics
-      >> created RobotoMono-Regular.ttf.metrics
-      >> created RobotoSlab-Regular.ttf.metrics
+  ```bash
+  mix archive.install hex truetype_metrics
+  ```
+
+  ## Generate a metrics file for one font
+
+  ```bash
+  mix truetype_metrics Roboto-Regular.ttf
+
+  >> create Roboto-Regular.ttf.metrics
+  ```
+
+  ## Generate a metrics for all fonts in a directory
+
+  ```bash
+  mix truetype_metrics priv/static/fonts
+
+  >> created Roboto-Regular.ttf.metrics
+  >> created RobotoMono-Regular.ttf.metrics
+  >> created RobotoSlab-Regular.ttf.metrics
+  ```
+
+  ## Options
 
   The -d option will automatically append the hash of the font file to the name
   of the font file itself.
 
-      mix truetype_metrics fonts -d
+  ```bash
+  mix truetype_metrics fonts -d
 
-      >> created Roboto-Regular.ttf.metrics
-      >> renamed Roboto-Regular.ttf to Roboto-Regular.ttf.eehRQEZX2sIQaz0irSVtR4JKmldlRY7bcskQKkWBbZU
+  >> created Roboto-Regular.ttf.metrics
+  >> renamed Roboto-Regular.ttf to Roboto-Regular.ttf.eehRQEZX2sIQaz0irSVtR4JKmldlRY7bcskQKkWBbZU
+  ```
 
-  The -r option will recurse the given folder and generate metrics for all found fonts
+  The -r option will recurse the given folder and generate metrics for all found fonts.
 
   """
   # import IEx
