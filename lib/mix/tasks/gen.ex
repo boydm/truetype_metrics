@@ -11,7 +11,7 @@ defmodule Mix.Tasks.TruetypeMetrics do
 
       mix truetype_metrics Roboto-Regular.ttf
 
-      >> * creating Roboto-Regular.ttf.metrics
+      >> create Roboto-Regular.ttf.metrics
 
   You can also point it at a directory to have it generate metrics for all the fonts within
 
@@ -20,19 +20,28 @@ defmodule Mix.Tasks.TruetypeMetrics do
       >> created Roboto-Regular.ttf.metrics
       >> created RobotoMono-Regular.ttf.metrics
       >> created RobotoSlab-Regular.ttf.metrics
+
+  The -d option will automatically append the hash of the font file to the name
+  of the font file itself.
+
+      mix truetype_metrics fonts -d
+
+      >> created Roboto-Regular.ttf.metrics
+      >> renamed Roboto-Regular.ttf to Roboto-Regular.ttf.eehRQEZX2sIQaz0irSVtR4JKmldlRY7bcskQKkWBbZU
+
+  The -r option will recurse the given folder and generate metrics for all found fonts
+
   """
   # import IEx
 
   @switches [
     recurse: :boolean,
-    decorate_font: :boolean,
-    force: :boolean
+    decorate_font: :boolean
   ]
 
   @aliases [
     r: :recurse,
-    d: :decorate_font,
-    f: :force
+    d: :decorate_font
   ]
 
   @doc false
@@ -118,22 +127,6 @@ defmodule Mix.Tasks.TruetypeMetrics do
         :error
     end
   end
-
-  #--------------------------------------------------------
-  # defp validate_path(path) do
-  #   case File.dir?(path) do
-  #     true ->
-  #       {:ok, path}
-
-  #     false ->
-  #       put_msg(
-  #         IO.ANSI.red() <>
-  #         "Invalid Destination Directory: \"#{path}\"" <>
-  #         IO.ANSI.default_color()
-  #       )
-  #       :error
-  #   end
-  # end
 
   #--------------------------------------------------------
   defp put_msg( msg ) do
