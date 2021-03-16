@@ -80,7 +80,6 @@ defmodule TruetypeMetrics do
       # calculate a better sha hash of the font
       signature =
         :crypto.hash(@signature_type, font_data)
-        |> Base.url_encode64(padding: false)
 
       # build the final FontMetrics struct
       {:ok,
