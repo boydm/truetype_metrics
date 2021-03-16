@@ -55,9 +55,7 @@ defmodule TruetypeMetricsTest do
 
     assert metrics.source.signature_type == :sha256
 
-    signature =
-      :crypto.hash(:sha256, File.read!(@roboto))
-      |> Base.url_encode64(padding: false)
+    signature = :crypto.hash(:sha256, File.read!(@roboto))
 
     assert metrics.source.signature == signature
     assert metrics.source.font_type == :true_type
@@ -68,9 +66,7 @@ defmodule TruetypeMetricsTest do
     {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.parse(font_data, "Roboto-Regular.ttf")
     assert metrics.source.signature_type == :sha256
 
-    signature =
-      :crypto.hash(:sha256, font_data)
-      |> Base.url_encode64(padding: false)
+    signature = :crypto.hash(:sha256, font_data)
 
     assert metrics.source.signature == signature
   end
@@ -97,9 +93,7 @@ defmodule TruetypeMetricsTest do
 
     assert metrics.source.signature_type == :sha256
 
-    signature =
-      :crypto.hash(:sha256, File.read!(@bitter))
-      |> Base.url_encode64(padding: false)
+    signature = :crypto.hash(:sha256, File.read!(@bitter))
 
     assert metrics.source.signature == signature
     assert metrics.source.font_type == :true_type
@@ -110,9 +104,7 @@ defmodule TruetypeMetricsTest do
     {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.parse(font_data, "Bitter-Regular.ttf")
     assert metrics.source.signature_type == :sha256
 
-    signature =
-      :crypto.hash(:sha256, font_data)
-      |> Base.url_encode64(padding: false)
+    signature = :crypto.hash(:sha256, font_data)
 
     assert metrics.source.signature == signature
   end
