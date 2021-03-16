@@ -8,7 +8,7 @@ defmodule TruetypeMetrics.MixProject do
 
   @app_name :truetype_metrics
 
-  @version "0.3.0"
+  @version "0.4.0"
 
   @elixir_version "~> 1.8"
   @github "https://github.com/boydm/truetype_metrics"
@@ -16,7 +16,7 @@ defmodule TruetypeMetrics.MixProject do
   def project do
     [
       app: @app_name,
-      version: "0.3.0",
+      version: @version,
       elixir: @elixir_version,
       start_permanent: Mix.env() == :prod,
       deps: deps(),
