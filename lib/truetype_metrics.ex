@@ -78,8 +78,7 @@ defmodule TruetypeMetrics do
          {:ok, hhea, metrics} <- parse_metrics(font_data, tables, glyph_ids),
          {:ok, kerning} <- parse_kern(font_data, tables, glyph_ids) do
       # calculate a better sha hash of the font
-      signature =
-        :crypto.hash(@signature_type, font_data)
+      signature = :crypto.hash(@signature_type, font_data)
 
       # build the final FontMetrics struct
       {:ok,
