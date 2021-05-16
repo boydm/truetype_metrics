@@ -225,7 +225,7 @@ defmodule TruetypeMetrics do
         Enum.reduce(glyph_ids, %{}, fn {id, codepoints}, out ->
           case hmtx[id] do
             nil -> out
-            {adv, _} -> Enum.reduce(codepoints, out, &Map.put(&2, &1, adv))
+            adv -> Enum.reduce(codepoints, out, &Map.put(&2, &1, adv))
           end
         end)
 
@@ -285,46 +285,22 @@ defmodule TruetypeMetrics do
   defp parse_hhea(_), do: {:error, :invalid_table, "hhea"}
 
   # --------------------------------------------------------
-  defp parse_hmtx(metrics, last_metric, out \\ %{}, n \\ 0)
+  defp parse_hmtx(metrics, num_metrics, out \\ %{}, n \\ 0)
 
-  defp parse_hmtx("", _, out, _), do: {:ok, out}
-
-  defp parse_hmtx(
-         <<advance_width::signed-integer-size(16)-big>>,
-         _,
-         out,
-         _
-       ) do
-    out = Map.put(out, :default, {advance_width, 0})
-    {:ok, out}
-  end
+  defp parse_hmtx(_, 0, out, _), do: {:ok, out}
 
   defp parse_hmtx(
          <<
            advance_width::signed-integer-size(16)-big,
-           lsb::signed-integer-size(16)-big
-         >>,
-         last_metric,
-         out,
-         n
-       )
-       when n == last_metric do
-    out = Map.put(out, :default, {advance_width, lsb})
-    {:ok, out}
-  end
-
-  defp parse_hmtx(
-         <<
-           advance_width::signed-integer-size(16)-big,
-           lsb::signed-integer-size(16)-big,
+           _lsb::signed-integer-size(16)-big,
            metrics::binary
          >>,
-         last_metric,
+         num_metrics,
          out,
          n
        ) do
-    out = Map.put(out, n, {advance_width, lsb})
-    parse_hmtx(metrics, last_metric, out, n + 1)
+    out = Map.put(out, n, advance_width)
+    parse_hmtx(metrics, num_metrics - 1, out, n + 1)
   end
 
   # ============================================================================
