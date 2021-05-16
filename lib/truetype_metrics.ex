@@ -296,7 +296,8 @@ defmodule TruetypeMetrics do
            metrics::binary
          >>,
          num_metrics,
-         out, n
+         out,
+         n
        ) do
     out = Map.put(out, n, advance_width)
     parse_hmtx(metrics, num_metrics - 1, out, n + 1)
