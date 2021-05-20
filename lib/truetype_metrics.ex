@@ -10,7 +10,7 @@ defmodule TruetypeMetrics do
 
   # import IEx
 
-  @version "0.1.0"
+  @version FontMetrics.version()
 
   @version_one <<0, 1, 0, 0>>
   @magic_number_bin <<0x5F, 0x0F, 0x3C, 0xF5>>

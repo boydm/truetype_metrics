@@ -120,4 +120,13 @@ defmodule TruetypeMetricsTest do
     assert TruetypeMetrics.parse(font_data, "Bitter-Regular.ttf") ==
              {:error, :checksum}
   end
+
+  test "uses version from FontMetrics" do
+    {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.load(@roboto)
+    assert metrics.version == FontMetrics.version()
+  end
 end
+
+
+
+
