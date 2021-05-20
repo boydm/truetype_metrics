@@ -126,7 +126,3 @@ defmodule TruetypeMetricsTest do
     assert metrics.version == FontMetrics.version()
   end
 end
-
-
-
-
