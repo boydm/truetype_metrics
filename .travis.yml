@@ -2,7 +2,7 @@ language: elixir
 sudo: true
 
 elixir:
-  - 1.8
+  - 1.11
 otp_release:
   - 23.0
 
