@@ -99,7 +99,8 @@ defmodule TruetypeMetrics do
          kerning: kerning,
          ascent: hhea.ascent,
          descent: hhea.descent,
-         metrics: metrics
+         metrics: metrics,
+         line_gap: hhea.line_gap
        }}
     else
       bad_checksum when is_integer(bad_checksum) -> @invalid_font

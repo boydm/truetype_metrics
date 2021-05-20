@@ -8,7 +8,7 @@ defmodule TruetypeMetrics.MixProject do
 
   @app_name :truetype_metrics
 
-  @version "0.4.1"
+  @version "0.5.0"
 
   @elixir_version "~> 1.8"
   @github "https://github.com/boydm/truetype_metrics"
@@ -36,11 +36,12 @@ defmodule TruetypeMetrics.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:font_metrics, "~> 0.3"},
+      {:font_metrics, "~> 0.5"},
       {:ex_doc, ">= 0.0.0", only: :dev},
       {:excoveralls, ">= 0.0.0", only: :test, runtime: false},
       {:credo, ">= 0.0.0", only: [:dev, :test], runtime: false},
-      {:inch_ex, "~> 2.0", only: [:dev, :docs], runtime: false}
+      {:inch_ex, "~> 2.0", only: [:dev, :docs], runtime: false},
+      {:dialyxir, "~> 1.1", only: :dev, runtime: false}
     ]
   end
 
