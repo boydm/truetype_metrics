@@ -10,7 +10,7 @@ defmodule TruetypeMetricsTest do
   @roboto "test/fonts/Roboto/Roboto-Regular.ttf"
   @bitter "test/fonts/Bitter/Bitter-Regular.ttf"
 
-  @hash_type :sha3_256
+  @hash_type FontMetrics.expected_hash()
 
   # ============================================================================
   # checksum
