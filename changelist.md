@@ -1,5 +1,7 @@
 # Changelist
 
+## v0.5.1
+  * fix off-by-one error pulling metrics from the hmtx file.
 
 ## v0.5.0
   * Sync with FontMetrics v0.5.0

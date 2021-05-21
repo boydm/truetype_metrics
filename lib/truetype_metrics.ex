@@ -218,7 +218,7 @@ defmodule TruetypeMetrics do
     with {:ok, data} <- get_table_data(font_data, tables, "hhea"),
          {:ok, hhea} <- parse_hhea(data),
          {:ok, data} <- get_table_data(font_data, tables, "hmtx"),
-         {:ok, hmtx} <- parse_hmtx(data, hhea.num_h_metrics - 1) do
+         {:ok, hmtx} <- parse_hmtx(data, hhea.num_h_metrics) do
       # combine it all together..
 
       # The id points to a glyph. We want to point to codepoints
@@ -231,7 +231,7 @@ defmodule TruetypeMetrics do
         end)
 
       # get the default advance
-      default_advance = metrics[0xFFFF] || metrics[0]
+      default_advance = metrics[0xFFFF] || metrics[0] || hhea.advance_width_max
 
       # scan metrics one more time to remove dupes of default_advance
       metrics =
