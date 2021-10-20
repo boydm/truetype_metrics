@@ -1,5 +1,8 @@
 # Changelist
 
+## v0.5.2
+  * Add :crypto to the list of required applications.
+
 ## v0.5.1
   * fix off-by-one error pulling metrics from the hmtx file.
 

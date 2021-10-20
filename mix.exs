@@ -8,7 +8,7 @@ defmodule TruetypeMetrics.MixProject do
 
   @app_name :truetype_metrics
 
-  @version "0.5.1"
+  @version "0.5.2"
 
   @elixir_version "~> 1.8"
   @github "https://github.com/boydm/truetype_metrics"
@@ -29,7 +29,7 @@ defmodule TruetypeMetrics.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger, :crypto]
     ]
   end
 
