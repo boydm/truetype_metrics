@@ -9,6 +9,7 @@ defmodule TruetypeMetricsTest do
 
   @roboto "test/fonts/Roboto/Roboto-Regular.ttf"
   @bitter "test/fonts/Bitter/Bitter-Regular.ttf"
+  @fira_code "test/fonts/FiraCode/FiraCode-Regular.ttf"
 
   @hash_type FontMetrics.expected_hash()
 
@@ -104,6 +105,35 @@ defmodule TruetypeMetricsTest do
   test "parses the Bitter-Regular file" do
     font_data = File.read!(@bitter)
     {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.parse(font_data, "Bitter-Regular.ttf")
+    assert metrics.source.signature_type == @hash_type
+
+    signature = :crypto.hash(@hash_type, font_data)
+
+    assert metrics.source.signature == signature
+  end
+
+  # ============================================================================
+  # firacode
+
+  test "loads the FiraCode-Regular.ttf file" do
+    {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.load(@fira_code)
+    assert metrics.max_box == {-3555, -1000, 2384, 2400}
+    assert metrics.units_per_em == 1950
+    assert metrics.smallest_ppem == 6
+    assert metrics.direction == 2
+    assert metrics.kerning == %{}
+
+    assert metrics.source.signature_type == @hash_type
+
+    signature = :crypto.hash(@hash_type, File.read!(@fira_code))
+
+    assert metrics.source.signature == signature
+    assert metrics.source.font_type == :true_type
+  end
+
+  test "parses the FiraCode-fira_code file" do
+    font_data = File.read!(@roboto)
+    {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.parse(font_data, "FiraCode-Regular.ttf")
     assert metrics.source.signature_type == @hash_type
 
     signature = :crypto.hash(@hash_type, font_data)
