@@ -356,6 +356,7 @@ defmodule TruetypeMetrics do
   # end
 
   # type 4 - disconnected ranges. ugh. Pretty common tho
+  # https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-4-segment-mapping-to-delta-values
   defp do_parse_unicode_cmap_glyphs(<<
          4::unsigned-integer-size(16)-big,
          _size::unsigned-integer-size(16)-big,
@@ -396,6 +397,48 @@ defmodule TruetypeMetrics do
       end)
 
     {:ok, glyph_ids}
+  end
+
+  # type 12 cmap table. Segmented Coverage...
+  # https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-12-segmented-coverage
+  defp do_parse_unicode_cmap_glyphs(<<
+         12::unsigned-integer-size(16)-big,
+         0::unsigned-integer-size(16),
+         _size::unsigned-integer-size(32)-big,
+         _language::unsigned-integer-size(32)-big,
+         num_groups::unsigned-integer-size(32)-big,
+         map_groups::binary
+       >>) do
+    # if this is a valid font, the size of each map_group should be 12 bytes (see docs)
+    if byte_size(map_groups) == num_groups * 12 do
+      build_type_12_glyph_ids(map_groups)
+    else
+      raise """
+      invalid type 12 cmap table
+      see https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-12-segmented-coverage
+      """
+    end
+  end
+
+  defp build_type_12_glyph_ids(map_groups, glyph_ids \\ %{})
+  defp build_type_12_glyph_ids(<<>>, glyph_ids), do: {:ok, glyph_ids}
+
+  defp build_type_12_glyph_ids(
+         <<
+           start_char_code::unsigned-integer-size(32)-big,
+           end_char_code::unsigned-integer-size(32)-big,
+           start_glyph_id::unsigned-integer-size(32)-big,
+           map_groups::binary
+         >>,
+         glyph_ids
+       ) do
+    glyph_ids =
+      Enum.reduce(start_char_code..end_char_code, glyph_ids, fn codepoint, ids ->
+        glyph_id = codepoint - start_char_code + start_glyph_id
+        Map.put(ids, glyph_id, [codepoint | Map.get(ids, glyph_id, [])])
+      end)
+
+    build_type_12_glyph_ids(map_groups, glyph_ids)
   end
 
   defp lookup_cmap_type_4(sub_table, skip) do

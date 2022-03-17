@@ -14,7 +14,7 @@ by adding `truetype_metrics` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:truetype_metrics, "~> 0.5"}
+    {:truetype_metrics, "~> 0.6"}
   ]
 end
 ```

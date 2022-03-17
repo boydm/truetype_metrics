@@ -1,5 +1,8 @@
 # Changelist
 
+## v0.6.0
+  * Add support and tests for type 12 cmap tables.
+
 ## v0.5.2
   * Add :crypto to the list of required applications.
 

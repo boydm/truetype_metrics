@@ -8,7 +8,7 @@ defmodule TruetypeMetrics.MixProject do
 
   @app_name :truetype_metrics
 
-  @version "0.5.2"
+  @version "0.6.0"
 
   @elixir_version "~> 1.8"
   @github "https://github.com/boydm/truetype_metrics"
@@ -47,10 +47,8 @@ defmodule TruetypeMetrics.MixProject do
 
   defp docs do
     [
-      main: "Mix.Tasks.TruetypeMetrics",
       source_ref: "v#{@version}",
       source_url: "https://github.com/boydm/truetype_metrics"
-      # homepage_url: "http://kry10.com",
     ]
   end
 
