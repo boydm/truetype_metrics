@@ -114,6 +114,7 @@ defmodule TruetypeMetricsTest do
 
   # ============================================================================
   # firacode
+  # the firacode font has a type 12 cmap table in it.
 
   test "loads the FiraCode-Regular.ttf file" do
     {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.load(@fira_code)
