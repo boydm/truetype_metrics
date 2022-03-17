@@ -8,7 +8,7 @@ defmodule TruetypeMetrics do
   Documentation for TruetypeMetrics.
   """
 
-  import IEx
+  # import IEx
 
   @version FontMetrics.version()
 
@@ -404,7 +404,7 @@ defmodule TruetypeMetrics do
   defp do_parse_unicode_cmap_glyphs(<<
          12::unsigned-integer-size(16)-big,
          0::unsigned-integer-size(16),
-         size::unsigned-integer-size(32)-big,
+         _size::unsigned-integer-size(32)-big,
          _language::unsigned-integer-size(32)-big,
          num_groups::unsigned-integer-size(32)-big,
          map_groups::binary
