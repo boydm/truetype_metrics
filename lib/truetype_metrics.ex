@@ -399,19 +399,20 @@ defmodule TruetypeMetrics do
     {:ok, glyph_ids}
   end
 
+
   # type 12 cmap table. Segmented Coverage...
   # https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-12-segmented-coverage
   defp do_parse_unicode_cmap_glyphs(<<
          12::unsigned-integer-size(16)-big,
          0::unsigned-integer-size(16),
-         _size::unsigned-integer-size(32)-big,
-         _language::unsigned-integer-size(32)-big,
+         size::unsigned-integer-size(32)-big,
+         language::unsigned-integer-size(32)-big,
          num_groups::unsigned-integer-size(32)-big,
          map_groups::binary
        >>) do
     # if this is a valid font, the size of each map_group should be 12 bytes (see docs)
-    if byte_size(map_groups) == num_groups * 12 do
-      build_type_12_glyph_ids(map_groups)
+    if byte_size(map_groups) >= num_groups * 12 do
+      build_type_12_glyph_ids(map_groups, num_groups)
     else
       raise """
       invalid type 12 cmap table
@@ -420,9 +421,8 @@ defmodule TruetypeMetrics do
     end
   end
 
-  defp build_type_12_glyph_ids(map_groups, glyph_ids \\ %{})
-  defp build_type_12_glyph_ids(<<>>, glyph_ids), do: {:ok, glyph_ids}
-
+  defp build_type_12_glyph_ids(map_groups, num_groups, glyph_ids \\ %{})
+  defp build_type_12_glyph_ids(_, 0, glyph_ids), do: {:ok, glyph_ids}
   defp build_type_12_glyph_ids(
          <<
            start_char_code::unsigned-integer-size(32)-big,
@@ -430,6 +430,7 @@ defmodule TruetypeMetrics do
            start_glyph_id::unsigned-integer-size(32)-big,
            map_groups::binary
          >>,
+         num_groups,
          glyph_ids
        ) do
     glyph_ids =
@@ -438,7 +439,7 @@ defmodule TruetypeMetrics do
         Map.put(ids, glyph_id, [codepoint | Map.get(ids, glyph_id, [])])
       end)
 
-    build_type_12_glyph_ids(map_groups, glyph_ids)
+    build_type_12_glyph_ids(map_groups, num_groups - 1, glyph_ids)
   end
 
   defp lookup_cmap_type_4(sub_table, skip) do
