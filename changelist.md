@@ -1,5 +1,8 @@
 # Changelist
 
+## v0.6.1
+  * One of the Font Awesome fonts has extra data at the end of the type 12 CMAP table. This update extracts the character groups, then ignores the extra data.
+
 ## v0.6.0
   * Add support and tests for type 12 cmap tables.
 
