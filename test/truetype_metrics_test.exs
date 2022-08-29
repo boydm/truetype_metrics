@@ -157,7 +157,6 @@ defmodule TruetypeMetricsTest do
     assert metrics.version == FontMetrics.version()
   end
 
-
   # ============================================================================
   # font awesome
   # add font_awesome yourself. When you add the file, the test will run
@@ -178,5 +177,4 @@ defmodule TruetypeMetricsTest do
       assert metrics.source.font_type == :true_type
     end
   end
-
 end

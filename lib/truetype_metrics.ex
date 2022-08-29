@@ -399,14 +399,13 @@ defmodule TruetypeMetrics do
     {:ok, glyph_ids}
   end
 
-
   # type 12 cmap table. Segmented Coverage...
   # https://docs.microsoft.com/en-us/typography/opentype/spec/cmap#format-12-segmented-coverage
   defp do_parse_unicode_cmap_glyphs(<<
          12::unsigned-integer-size(16)-big,
          0::unsigned-integer-size(16),
-         size::unsigned-integer-size(32)-big,
-         language::unsigned-integer-size(32)-big,
+         _size::unsigned-integer-size(32)-big,
+         _language::unsigned-integer-size(32)-big,
          num_groups::unsigned-integer-size(32)-big,
          map_groups::binary
        >>) do
@@ -423,6 +422,7 @@ defmodule TruetypeMetrics do
 
   defp build_type_12_glyph_ids(map_groups, num_groups, glyph_ids \\ %{})
   defp build_type_12_glyph_ids(_, 0, glyph_ids), do: {:ok, glyph_ids}
+
   defp build_type_12_glyph_ids(
          <<
            start_char_code::unsigned-integer-size(32)-big,
