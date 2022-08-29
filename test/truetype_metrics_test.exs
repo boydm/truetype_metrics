@@ -156,4 +156,25 @@ defmodule TruetypeMetricsTest do
     {:ok, %FontMetrics{} = metrics} = TruetypeMetrics.load(@roboto)
     assert metrics.version == FontMetrics.version()
   end
+
+  # ============================================================================
+  # font awesome
+  # add font_awesome yourself. When you add the file, the test will run
+  @font_awesome "test/fonts/font_awesome/Font-Awesome-6-Free-Regular-400.ttf"
+  test "loads the Font-Awesome-6-Free-Regular-400.ttf file" do
+    with {:ok, %FontMetrics{} = metrics} <- TruetypeMetrics.load(@font_awesome) do
+      assert metrics.max_box == {-6, -69, 645, 453}
+      assert metrics.units_per_em == 512
+      assert metrics.smallest_ppem == 8
+      assert metrics.direction == 2
+      assert metrics.kerning == %{}
+
+      assert metrics.source.signature_type == @hash_type
+
+      signature = :crypto.hash(@hash_type, File.read!(@font_awesome))
+
+      assert metrics.source.signature == signature
+      assert metrics.source.font_type == :true_type
+    end
+  end
 end
